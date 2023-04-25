@@ -21,29 +21,30 @@ const enum Algorithm {
 }
 
 export interface DigestOptions {
+  /** Algorithm. */
   readonly algorithm?: `${Algorithm}`;
 
-  /**
+  /** Realm.
    * @default "Secure area"
    */
   readonly realm?: string;
-  readonly nonce?: string;
-  readonly opaque?: string;
-  readonly stale?: boolean;
-  readonly domain?: string[];
-  readonly qop?: readonly QOP[];
-  readonly charset?: "UTF-8";
 
-  /**
-   * @deprecated
-   */
-  readonly userhash?: string;
+  /** Calculate nonce. */
+  readonly nonce?: () => string;
+  // readonly opaque?: string;
+  // readonly stale?: boolean;
+  // readonly domain?: string[];
+  readonly qop?: readonly QOP[];
+
+  /** Encoding scheme. */
+  readonly charset?: "UTF-8";
 }
 
 interface DigestArgs extends Realm {
   readonly algorithm?: `${Algorithm}`;
   readonly nonce: Quoted;
   readonly qop: string;
+  readonly charset?: "UTF-8";
 }
 
 type QOP = "auth" | "auth-init";
@@ -51,27 +52,36 @@ type QOP = "auth" | "auth-init";
 export class Digest implements Authentication {
   scheme = "Digest";
 
-  #staticOptions: Omit<DigestArgs, "nonce">;
+  #staticOptions: AuthParams;
   #hash: (input: string) => string;
   #algorithm: `${Algorithm}`;
   #sess: boolean;
+  #nonce: () => string;
 
   constructor(
     public users: Readonly<Record<string, string>>,
     public readonly options: DigestOptions = {},
   ) {
-    const { qop = ["auth"], realm = DEFAULT_REALM, algorithm = Algorithm.MD5 } =
-      options;
-
-    this.#algorithm = algorithm;
-    this.#hash = Supported[normalizeAlgorithm(algorithm as Algorithm)];
-    this.#sess = algorithm.endsWith("sess");
-
-    this.#staticOptions = {
+    const {
+      qop = ["auth"],
+      realm = DEFAULT_REALM,
+      algorithm,
+      charset,
+      nonce = calculateNonce,
+    } = options;
+    const params: Omit<DigestArgs, "nonce"> = {
+      charset,
       realm: quoted(realm),
       qop: qop.join(", "),
-      algorithm: options?.algorithm,
+      algorithm,
     };
+    const algo = algorithm ?? Algorithm.MD5;
+
+    this.#staticOptions = omitBy(params, isUndefined);
+    this.#algorithm = algo;
+    this.#hash = Supported[normalizeAlgorithm(algo as Algorithm)];
+    this.#sess = algo.endsWith("sess");
+    this.#nonce = nonce;
   }
 
   authenticate(token: Parameters, request: Request): boolean {
@@ -101,11 +111,10 @@ export class Digest implements Authentication {
       return a1;
     });
     const A2 = `${method}:${unq(uri)}`;
-    const hashList = a1List.map((a1) =>
-      this.#hash(
-        `${this.#hash(a1)}:${unq(nonce)}:${nc}:${unq(cnonce)}:${unq(qop)}:${
-          this.#hash(A2)
-        }`,
+    const hashList = a1List.map((A1) =>
+      this.#KD(
+        this.#H(A1),
+        `${unq(nonce)}:${nc}:${unq(cnonce)}:${unq(qop)}:${this.#H(A2)}`,
       )
     ).map(quoted);
 
@@ -113,18 +122,27 @@ export class Digest implements Authentication {
   }
 
   challenge(): string {
-    const nonce = crypto.randomUUID();
-    const params: DigestArgs = {
-      ...this.#staticOptions,
-      nonce: quoted(nonce),
-    };
-
+    const nonce = this.#nonce();
     const challenge = stringifyChallenge({
       authScheme: this.scheme,
-      params: omitBy(params, isUndefined),
+      params: { ...this.#staticOptions, nonce: quoted(nonce) },
     });
 
     return challenge;
+  }
+
+  /**
+   * @see [RFC 7616, 3.3.  The WWW-Authenticate Response Header Field](https://datatracker.ietf.org/doc/html/rfc7616#section-3.3)
+   */
+  #H(data: string): string {
+    return this.#hash(data);
+  }
+
+  /** Calculate key for digest.
+   * @see [RFC 7616, 3.3.  The WWW-Authenticate Response Header Field](https://datatracker.ietf.org/doc/html/rfc7616#section-3.3)
+   */
+  #KD(secret: string, data: string): string {
+    return this.#H(concat(secret, ":", data));
   }
 }
 
@@ -140,6 +158,10 @@ export function unq(input: string): string {
   }
 
   return input;
+}
+
+function calculateNonce(): string {
+  return btoa(crypto.randomUUID());
 }
 
 export function calcA1(
