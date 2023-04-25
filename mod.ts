@@ -9,3 +9,4 @@ export {
   type BasicOptions,
   type User,
 } from "./schemes/basic.ts";
+export { Digest } from "./schemes/digest.ts";
