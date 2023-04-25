@@ -2,16 +2,21 @@
 // This module is browser compatible.
 
 import {
-  type AuthParams,
   isErr,
   isString,
+  isUndefined,
   stringifyChallenge,
   unsafe,
 } from "../deps.ts";
-import type { Authentication } from "../types.ts";
+import { omitBy, quoted } from "../utils.ts";
+import { DEFAULT_REALM } from "../constants.ts";
+import type { Authentication, Parameters, Realm } from "../types.ts";
 
 export interface User {
+  /** The user name. */
   readonly name: string;
+
+  /** The user password. */
   readonly password: string;
 }
 
@@ -19,68 +24,53 @@ export interface Authorizer {
   (user: User): boolean | Promise<boolean>;
 }
 
-export interface BasicOptions extends Partial<BasicAuthParams> {
+/** Basic authentication options. */
+export interface BasicOptions {
   /**
    * @default `"Secure area"`
    */
   readonly realm?: string;
-}
-
-export interface BasicAuthParams {
-  /** Realm. */
-  readonly realm: string;
 
   readonly charset?: "UTF-8";
 }
 
-const DEFAULT_AUTH_PARAM: BasicAuthParams = {
-  realm: `"Secure area"`,
+interface BasicAuthParams extends Realm {
+  readonly charset?: `"UTF-8"`;
+}
+
+const DEFAULT_AUTH_PARAM = {
+  realm: DEFAULT_REALM,
 };
 
-/** HTTP Basic Authentication.
- *
- * @example
- * ```ts
- * import auth from "https://deno.land/x/http_auth@$VERSION/mod.ts";
- * import Basic from "https://deno.land/x/http_auth@$VERSION/basic.ts";
- * import { assertEquals } from "https://deno.land/std@0.177.0/testing/asserts.ts";
- *
- * const middleware = auth(
- *   new Basic({ "<user-id>": "<password>", admin: "123456" }),
- * );
- * const response = await middleware(
- *   new Request("http://localhost"),
- *   () => new Response(),
- * );
- *
- * assertEquals(
- *   response.headers.get("www-authenticate"),
- *   `Basic realm="Secure aria"`,
- * );
- * ```
- */
+/** HTTP Basic Authentication. */
 export class Basic implements Authentication {
   #wwwAuthenticate: string;
 
   readonly scheme = "Basic";
 
+  /**
+   * @throws {Error} If the options include invalid member.
+   */
   constructor(
     public readonly authorizer: Authorizer,
-    readonly options: BasicOptions = DEFAULT_AUTH_PARAM,
+    options: BasicOptions = DEFAULT_AUTH_PARAM,
   ) {
     const { realm = DEFAULT_AUTH_PARAM.realm, charset } = options;
-
-    const data: AuthParams = charset ? { realm, charset } : { realm };
+    const params: BasicAuthParams = {
+      realm: quoted(realm),
+      charset: charset && quoted(charset),
+    };
+    const data = omitBy(params, isUndefined);
     this.#wwwAuthenticate = stringifyChallenge({
       authScheme: this.scheme,
       params: data,
     });
   }
 
-  async authenticate(token: AuthParams): Promise<boolean> {
-    if (!isString(token)) return false;
+  async authenticate(params: Parameters): Promise<boolean> {
+    if (!isString(params)) return false;
 
-    const b64Result = unsafe(() => atob(token));
+    const b64Result = unsafe(() => atob(params));
 
     if (isErr(b64Result)) return false;
 
@@ -90,11 +80,9 @@ export class Basic implements Authentication {
     if (isErr(resultUserPass)) return false;
 
     const userPass = resultUserPass.value;
+    const user: User = { name: userPass.userId, password: userPass.password };
 
-    return await this.authorizer({
-      name: userPass.userId,
-      password: userPass.password,
-    });
+    return await this.authorizer(user);
   }
 
   challenge(): string {
@@ -104,21 +92,24 @@ export class Basic implements Authentication {
 
 /** @see https://www.rfc-editor.org/rfc/rfc7617#section-2 */
 // deno-lint-ignore no-control-regex
-const ReUserPass = /^([^\x00-\x1F\x7F]*?):([^\x00-\x1F\x7F]*)$/;
+const reUserPass = /^([^\x00-\x1F\x7F]*?):([^\x00-\x1F\x7F]*)$/;
 
 export interface UserPass {
+  /** User ID. */
   readonly userId: string;
+
+  /** User password. */
   readonly password: string;
 }
 
 /** Parse string into {@link UserPass}.
- * @throws {SyntaxError}
+ * @throws {SyntaxError} If the input is invalid syntax.
  */
 export function parseUserPass(input: string): UserPass {
-  const result = ReUserPass.exec(input);
+  const result = reUserPass.exec(input);
 
   if (!result || !isString(result[1]) || !isString(result[2])) {
-    throw SyntaxError("invalid syntax");
+    throw SyntaxError("invalid user-pass syntax");
   }
 
   return { userId: result[1], password: result[2] };
