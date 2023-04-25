@@ -9,12 +9,15 @@ import {
   stringifyChallenge,
   toHashString,
 } from "../deps.ts";
-import { concat, omitBy, Quoted, quoted } from "../utils.ts";
+import { concat, omitBy, type Quoted, quoted } from "../utils.ts";
 import { Char, DEFAULT_REALM } from "../constants.ts";
-import { Authentication } from "../types.ts";
+import type { Authentication, Parameters, Realm } from "../types.ts";
 
 const enum Algorithm {
   MD5 = "MD5",
+  MD5sess = `${Algorithm.MD5}-sess`,
+  SHA_256 = "SHA-256",
+  SHA_256sess = `${Algorithm.SHA_256}-sess`,
 }
 
 export interface DigestOptions {
@@ -37,11 +40,10 @@ export interface DigestOptions {
   readonly userhash?: string;
 }
 
-interface DigestArgs {
-  readonly realm: Quoted;
+interface DigestArgs extends Realm {
+  readonly algorithm?: `${Algorithm}`;
   readonly nonce: Quoted;
   readonly qop: string;
-  readonly algorithm?: `${Algorithm}`;
 }
 
 type QOP = "auth" | "auth-init";
@@ -52,6 +54,7 @@ export class Digest implements Authentication {
   #staticOptions: Omit<DigestArgs, "nonce">;
   #hash: (input: string) => string;
   #algorithm: `${Algorithm}`;
+  #sess: boolean;
 
   constructor(
     public users: Readonly<Record<string, string>>,
@@ -61,7 +64,8 @@ export class Digest implements Authentication {
       options;
 
     this.#algorithm = algorithm;
-    this.#hash = Supported[algorithm];
+    this.#hash = Supported[normalizeAlgorithm(algorithm as Algorithm)];
+    this.#sess = algorithm.endsWith("sess");
 
     this.#staticOptions = {
       realm: quoted(realm),
@@ -70,7 +74,7 @@ export class Digest implements Authentication {
     };
   }
 
-  authenticate(token: AuthParams, request: Request): boolean {
+  authenticate(token: Parameters, request: Request): boolean {
     if (isString(token) || !isDigestParams(token)) return false;
 
     const {
@@ -87,9 +91,15 @@ export class Digest implements Authentication {
     if (algorithm !== this.#algorithm) return false;
 
     const method = request.method;
-    const a1List = Object.entries(this.users).map(([username, passwd]) =>
-      calcA1({ username, realm, passwd })
-    );
+    const a1List = Object.entries(this.users).map(([username, passwd]) => {
+      const A1 = calcA1({ username, realm, passwd });
+
+      const a1 = this.#sess
+        ? `${this.#hash(A1)}:${unq(nonce)}:${unq(cnonce)}`
+        : A1;
+
+      return a1;
+    });
     const A2 = `${method}:${unq(uri)}`;
     const hashList = a1List.map((a1) =>
       this.#hash(
@@ -120,6 +130,7 @@ export class Digest implements Authentication {
 
 const Supported = {
   [Algorithm.MD5]: md5,
+  [Algorithm.SHA_256]: sha256,
 };
 
 /** Un-quoted string. */
@@ -141,16 +152,41 @@ export function calcA1(
   return concat(username, ":", unq(realm), ":", passwd);
 }
 
-function md5(input: string): string {
+export function md5(input: string): string {
   return toHashString(
-    crypto.subtle.digestSync("MD5", new TextEncoder().encode(input)),
+    crypto.subtle.digestSync(Algorithm.MD5, new TextEncoder().encode(input)),
   );
 }
 
-interface DigestParams extends AuthParams {
+export function sha256(input: string): string {
+  return toHashString(
+    crypto.subtle.digestSync(
+      Algorithm.SHA_256,
+      new TextEncoder().encode(input),
+    ),
+  );
+}
+
+function normalizeAlgorithm(
+  algorithm: Algorithm,
+): Algorithm.MD5 | Algorithm.SHA_256 {
+  switch (algorithm) {
+    case Algorithm.MD5sess: {
+      return Algorithm.MD5;
+    }
+    case Algorithm.SHA_256sess: {
+      return Algorithm.SHA_256;
+    }
+
+    default: {
+      return algorithm;
+    }
+  }
+}
+
+interface DigestParams extends AuthParams, Realm {
   readonly response: Quoted;
   readonly username: Quoted;
-  readonly realm: Quoted;
   readonly nonce: Quoted;
   readonly uri: Quoted;
   readonly cnonce: Quoted;
@@ -163,9 +199,7 @@ function isDigestParams(
 ): authParams is DigestParams {
   return Object
     .values(DigestParamKey)
-    .every((key) => {
-      return key in authParams;
-    });
+    .every((key) => key in authParams);
 }
 
 enum DigestParamKey {
