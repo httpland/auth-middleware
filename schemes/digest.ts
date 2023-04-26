@@ -40,15 +40,16 @@ export interface DigestOptions {
   /** Calculate nonce. */
   readonly nonce?: () => string | Promise<string>;
 
-  // TODO:(miyauci) Support this field.
-
   /** A string of data, specified by the server.
    * It is recommended that this string be Base64 or hexadecimal data.
    */
   readonly opaque?: string;
 
+  // TODO:(miyauci) Support this field.
   // readonly stale?: boolean;
-  // readonly domain?: string[];
+
+  /** Protection space specified with URI. */
+  readonly domain?: string[];
   readonly qop?: readonly QOP[];
 
   /** Encoding scheme. */
@@ -61,6 +62,7 @@ interface DigestArgs extends Realm {
   readonly qop: string;
   readonly charset?: "UTF-8";
   readonly opaque?: Quoted;
+  readonly domain?: Quoted;
 }
 
 type QOP = "auth" | "auth-init";
@@ -87,6 +89,7 @@ export class Digest implements Authentication {
       charset,
       nonce = calculateNonce,
       opaque,
+      domain,
     } = options;
     const params: Omit<DigestArgs, "nonce"> = {
       charset,
@@ -94,6 +97,7 @@ export class Digest implements Authentication {
       qop: qop.join(", "),
       algorithm,
       opaque: isString(opaque) ? quoted(opaque) : undefined,
+      domain: domain && quoted(domain.join(" ")),
     };
 
     this.#staticOptions = omitBy(params, isUndefined);
