@@ -71,10 +71,11 @@ export class Digest implements Authentication {
   #staticOptions: AuthParams;
   #algorithm: DigestAlgorithm;
   #nonce: () => string | Promise<string>;
+  #selectUser: SelectUser;
 
   constructor(
-    public readonly selectUser: SelectUser,
-    public readonly options: DigestOptions = {},
+    selectUser: SelectUser,
+    options: DigestOptions = {},
   ) {
     const {
       realm = DEFAULT_REALM,
@@ -96,11 +97,12 @@ export class Digest implements Authentication {
     this.#staticOptions = omitBy(params, isUndefined);
     this.#algorithm = algorithm ?? Algorithm.MD5;
     this.#nonce = nonce;
+    this.#selectUser = selectUser;
   }
 
   async authenticate(
     params: AuthParameters,
-    request: Request,
+    request: { readonly method: string },
   ): Promise<boolean> {
     if (isString(params) || !isDigestResponseParams(params)) return false;
 
@@ -118,13 +120,13 @@ export class Digest implements Authentication {
     if (algorithm !== this.#algorithm) return false;
 
     const username = unq(params.username);
-    const maybeUser = await this.selectUser(username);
+    const maybeUser = await this.#selectUser(username);
 
     if (!maybeUser || !timingSafeEqual(username, maybeUser.username)) {
       return false;
     }
 
-    const method = request.method;
+    const { method } = request;
     const res = calculateResponse({
       cnonce: unq(cnonce),
       method,
@@ -186,8 +188,19 @@ export function sha512_256(input: string): string {
   );
 }
 
-function calculateResponse(
-  {
+export function calculateResponse(context: {
+  username: string;
+  nonce: string;
+  secret: string;
+  method: string;
+  uri: string;
+  realm: string;
+  nc: string;
+  cnonce: string;
+  qop: string;
+  algorithm: DigestAlgorithm;
+}): string {
+  const {
     method,
     uri,
     username,
@@ -198,19 +211,7 @@ function calculateResponse(
     cnonce,
     qop,
     algorithm,
-  }: {
-    username: string;
-    nonce: string;
-    secret: string;
-    method: string;
-    uri: string;
-    realm: string;
-    nc: string;
-    cnonce: string;
-    qop: string;
-    algorithm: DigestAlgorithm;
-  },
-): string {
+  } = context;
   const sess = algorithm.endsWith("sess");
   const H = Supported[normalizeAlgorithm(algorithm as Algorithm)];
   const _A1 = concat(username, ":", realm, ":", secret);
@@ -274,7 +275,7 @@ interface DigestRequestParams extends DigestParams {
   readonly domain?: Quoted;
 }
 
-interface DigestResponseParams extends DigestParams {
+export interface DigestResponseParams extends DigestParams {
   readonly response: Quoted;
   readonly username: Quoted;
   readonly uri: Quoted;
