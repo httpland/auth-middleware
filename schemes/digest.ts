@@ -16,7 +16,7 @@ import {
   timingSafeEqual,
 } from "../utils.ts";
 import { Char, DEFAULT_REALM } from "../constants.ts";
-import type { Authentication, Parameters, Realm, User } from "../types.ts";
+import type { Authentication, AuthParameters, Realm, User } from "../types.ts";
 import { Crypto } from "./_wasm/mod.ts";
 
 const enum Algorithm {
@@ -57,15 +57,6 @@ export interface DigestOptions {
   // readonly userhash?: boolean
 }
 
-interface DigestArgs extends Realm {
-  readonly algorithm?: `${Algorithm}`;
-  readonly nonce: Quoted;
-  readonly qop: string;
-  readonly charset?: "UTF-8";
-  readonly opaque?: Quoted;
-  readonly domain?: Quoted;
-}
-
 export class Digest implements Authentication {
   scheme = "Digest";
 
@@ -87,7 +78,7 @@ export class Digest implements Authentication {
       opaque,
       domain,
     } = options;
-    const params: Omit<DigestArgs, "nonce"> = {
+    const params: Omit<DigestRequestParams, "nonce"> = {
       charset,
       realm: quoted(realm),
       qop: "auth",
@@ -101,8 +92,11 @@ export class Digest implements Authentication {
     this.#nonce = nonce;
   }
 
-  async authenticate(token: Parameters, request: Request): Promise<boolean> {
-    if (isString(token) || !isDigestParams(token)) return false;
+  async authenticate(
+    params: AuthParameters,
+    request: Request,
+  ): Promise<boolean> {
+    if (isString(params) || !isDigestResponseParams(params)) return false;
 
     const {
       nc,
@@ -113,11 +107,11 @@ export class Digest implements Authentication {
       response,
       realm,
       algorithm = Algorithm.MD5,
-    } = token;
+    } = params;
 
     if (algorithm !== this.#algorithm) return false;
 
-    const username = unq(token.username);
+    const username = unq(params.username);
     const maybeUser = await this.authorizer(username);
 
     if (!maybeUser || !timingSafeEqual(username, maybeUser.username)) {
@@ -262,19 +256,30 @@ function normalizeAlgorithm(
   }
 }
 
-interface DigestParams extends AuthParams, Realm {
+interface DigestParams extends Realm {
+  readonly nonce: Quoted;
+  readonly qop: string;
+  readonly opaque?: Quoted;
+}
+
+interface DigestRequestParams extends DigestParams {
+  readonly algorithm?: `${Algorithm}`;
+  readonly charset?: "UTF-8";
+  readonly domain?: Quoted;
+}
+
+interface DigestResponseParams extends DigestParams {
   readonly response: Quoted;
   readonly username: Quoted;
-  readonly nonce: Quoted;
   readonly uri: Quoted;
   readonly cnonce: Quoted;
-  readonly qop: string;
   readonly nc: string;
 }
 
-function isDigestParams(
-  authParams: Partial<AuthParams>,
-): authParams is DigestParams {
+function isDigestResponseParams(
+  // deno-lint-ignore no-explicit-any
+  authParams: Record<string, any>,
+): authParams is DigestResponseParams {
   return Object
     .values(DigestParamKey)
     .every((key) => key in authParams);

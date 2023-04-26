@@ -10,7 +10,7 @@ import {
 } from "../deps.ts";
 import { omitBy, quoted } from "../utils.ts";
 import { DEFAULT_REALM } from "../constants.ts";
-import type { Authentication, Parameters, Realm } from "../types.ts";
+import type { Authentication, AuthParameters, Realm } from "../types.ts";
 
 export interface User {
   /** The user name. */
@@ -67,7 +67,7 @@ export class Basic implements Authentication {
     });
   }
 
-  async authenticate(params: Parameters): Promise<boolean> {
+  async authenticate(params: AuthParameters): Promise<boolean> {
     if (!isString(params)) return false;
 
     const b64Result = unsafe(() => atob(params));
