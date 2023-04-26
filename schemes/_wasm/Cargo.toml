@@ -1,0 +1,22 @@
+[package]
+name = "auth_digest"
+version = "0.0.0"
+edition = "2021"
+
+[lib]
+crate_type = ["cdylib"]
+
+[profile.release]
+codegen-units = 1
+incremental = true
+lto = true
+opt-level = "z"
+
+[dependencies]
+derive_more = "0.99.17"
+digest = { version = "0.10.5", features = ["core-api", "std"] }
+js-sys = "0.3.60"
+md-5 = "0.10.5"
+sha2 = "0.10.6"
+typenum = "1.15.0"
+wasm-bindgen = "=0.2.84"
