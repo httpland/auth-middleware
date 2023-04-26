@@ -117,7 +117,7 @@ export class Digest implements Authentication {
       algorithm = Algorithm.MD5,
     } = params;
 
-    if (algorithm !== this.#algorithm) return false;
+    if (!isDigestAlgorithm(algorithm)) return false;
 
     const username = unq(params.username);
     const maybeUser = await this.#selectUser(username);
@@ -159,6 +159,24 @@ const Supported = {
   [Algorithm.SHA_256]: sha256,
   [Algorithm.SHA_512_256]: sha512_256,
 };
+
+/** Whether the input is {@link DigestAlgorithm} or not. */
+export function isDigestAlgorithm(input: string): input is DigestAlgorithm {
+  switch (input) {
+    case Algorithm.MD5:
+    case Algorithm.MD5sess:
+    case Algorithm.SHA_256sess:
+    case Algorithm.SHA_256:
+    case Algorithm.SHA_512_256:
+    case Algorithm.SHA_512_256sess: {
+      return true;
+    }
+
+    default: {
+      return false;
+    }
+  }
+}
 
 /** Un-quoted string. */
 export function unq(input: string): string {
