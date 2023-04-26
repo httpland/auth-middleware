@@ -28,10 +28,13 @@ const enum Algorithm {
   SHA_512_256sess = `${Algorithm.SHA_512_256}-sess`,
 }
 
+/** Digest algorithm. */
+export type DigestAlgorithm = `${Algorithm}`;
+
 /** Digest options. */
 export interface DigestOptions {
   /** Algorithm. */
-  readonly algorithm?: `${Algorithm}`;
+  readonly algorithm?: DigestAlgorithm;
 
   /** Realm.
    * @default "Secure area"
@@ -57,17 +60,20 @@ export interface DigestOptions {
   // readonly userhash?: boolean
 }
 
+/** User selection API. */
+export interface SelectUser {
+  (username: string): User | void | Promise<User | void>;
+}
+
 export class Digest implements Authentication {
   scheme = "Digest";
 
   #staticOptions: AuthParams;
-  #algorithm: `${Algorithm}`;
+  #algorithm: DigestAlgorithm;
   #nonce: () => string | Promise<string>;
 
   constructor(
-    public readonly authorizer: (
-      username: string,
-    ) => User | void | Promise<User | void>,
+    public readonly selectUser: SelectUser,
     public readonly options: DigestOptions = {},
   ) {
     const {
@@ -112,7 +118,7 @@ export class Digest implements Authentication {
     if (algorithm !== this.#algorithm) return false;
 
     const username = unq(params.username);
-    const maybeUser = await this.authorizer(username);
+    const maybeUser = await this.selectUser(username);
 
     if (!maybeUser || !timingSafeEqual(username, maybeUser.username)) {
       return false;
@@ -202,7 +208,7 @@ function calculateResponse(
     nc: string;
     cnonce: string;
     qop: string;
-    algorithm: `${Algorithm}`;
+    algorithm: DigestAlgorithm;
   },
 ): string {
   const sess = algorithm.endsWith("sess");

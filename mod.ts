@@ -2,10 +2,11 @@
 // This module is browser compatible.
 
 export { auth } from "./middleware.ts";
+export { type Authorizer, Basic, type BasicOptions } from "./schemes/basic.ts";
 export {
-  type Authorizer,
-  Basic,
-  type BasicOptions,
-  type User,
-} from "./schemes/basic.ts";
-export { Digest } from "./schemes/digest.ts";
+  Digest,
+  type DigestAlgorithm,
+  type DigestOptions,
+  type SelectUser,
+} from "./schemes/digest.ts";
+export type { User } from "./types.ts";
