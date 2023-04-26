@@ -3,7 +3,6 @@
 
 import {
   AuthParams,
-  crypto,
   isString,
   isUndefined,
   stringifyChallenge,
@@ -12,12 +11,15 @@ import {
 import { concat, omitBy, type Quoted, quoted } from "../utils.ts";
 import { Char, DEFAULT_REALM } from "../constants.ts";
 import type { Authentication, Parameters, Realm } from "../types.ts";
+import { Crypto } from "./_wasm/mod.ts";
 
 const enum Algorithm {
   MD5 = "MD5",
   MD5sess = `${Algorithm.MD5}-sess`,
   SHA_256 = "SHA-256",
   SHA_256sess = `${Algorithm.SHA_256}-sess`,
+  SHA_512_256 = "SHA-512-256",
+  SHA_512_256sess = `${Algorithm.SHA_512_256}-sess`,
 }
 
 export interface DigestOptions {
@@ -31,6 +33,8 @@ export interface DigestOptions {
 
   /** Calculate nonce. */
   readonly nonce?: () => string;
+
+  // TODO:(miyauci) Support this field.
   // readonly opaque?: string;
   // readonly stale?: boolean;
   // readonly domain?: string[];
@@ -53,7 +57,7 @@ export class Digest implements Authentication {
   scheme = "Digest";
 
   #staticOptions: AuthParams;
-  #hash: (input: string) => string;
+  #hash: (input: string) => string | Promise<string>;
   #algorithm: `${Algorithm}`;
   #sess: boolean;
   #nonce: () => string;
@@ -84,7 +88,7 @@ export class Digest implements Authentication {
     this.#nonce = nonce;
   }
 
-  authenticate(token: Parameters, request: Request): boolean {
+  async authenticate(token: Parameters, request: Request): Promise<boolean> {
     if (isString(token) || !isDigestParams(token)) return false;
 
     const {
@@ -101,22 +105,26 @@ export class Digest implements Authentication {
     if (algorithm !== this.#algorithm) return false;
 
     const method = request.method;
-    const a1List = Object.entries(this.users).map(([username, passwd]) => {
-      const A1 = calcA1({ username, realm, passwd });
+    const a1List = await Promise.all(
+      Object.entries(this.users).map(async ([username, passwd]) => {
+        const A1 = calcA1({ username, realm, passwd });
 
-      const a1 = this.#sess
-        ? `${this.#hash(A1)}:${unq(nonce)}:${unq(cnonce)}`
-        : A1;
+        const a1 = this.#sess
+          ? `${await this.#hash(A1)}:${unq(nonce)}:${unq(cnonce)}`
+          : A1;
 
-      return a1;
-    });
+        return a1;
+      }),
+    );
     const A2 = `${method}:${unq(uri)}`;
-    const hashList = a1List.map((A1) =>
-      this.#KD(
-        this.#H(A1),
-        `${unq(nonce)}:${nc}:${unq(cnonce)}:${unq(qop)}:${this.#H(A2)}`,
+    const hashList = await Promise.all(a1List.map(async (A1) =>
+      quoted(
+        await this.#KD(
+          await this.#H(A1),
+          `${unq(nonce)}:${nc}:${unq(cnonce)}:${unq(qop)}:${await this.#H(A2)}`,
+        ),
       )
-    ).map(quoted);
+    ));
 
     return hashList.includes(response);
   }
@@ -134,14 +142,14 @@ export class Digest implements Authentication {
   /**
    * @see [RFC 7616, 3.3.  The WWW-Authenticate Response Header Field](https://datatracker.ietf.org/doc/html/rfc7616#section-3.3)
    */
-  #H(data: string): string {
+  #H(data: string): string | Promise<string> {
     return this.#hash(data);
   }
 
   /** Calculate key for digest.
    * @see [RFC 7616, 3.3.  The WWW-Authenticate Response Header Field](https://datatracker.ietf.org/doc/html/rfc7616#section-3.3)
    */
-  #KD(secret: string, data: string): string {
+  #KD(secret: string, data: string): string | Promise<string> {
     return this.#H(concat(secret, ":", data));
   }
 }
@@ -149,6 +157,7 @@ export class Digest implements Authentication {
 const Supported = {
   [Algorithm.MD5]: md5,
   [Algorithm.SHA_256]: sha256,
+  [Algorithm.SHA_512_256]: sha512_256,
 };
 
 /** Un-quoted string. */
@@ -176,13 +185,22 @@ export function calcA1(
 
 export function md5(input: string): string {
   return toHashString(
-    crypto.subtle.digestSync(Algorithm.MD5, new TextEncoder().encode(input)),
+    Crypto.subtle.digestSync(Algorithm.MD5, new TextEncoder().encode(input)),
   );
 }
 
-export function sha256(input: string): string {
+export function sha512_256(input: string): string {
   return toHashString(
-    crypto.subtle.digestSync(
+    Crypto.subtle.digestSync(
+      Algorithm.SHA_512_256,
+      new TextEncoder().encode(input),
+    ),
+  );
+}
+
+export async function sha256(input: string): Promise<string> {
+  return toHashString(
+    await crypto.subtle.digest(
       Algorithm.SHA_256,
       new TextEncoder().encode(input),
     ),
@@ -191,13 +209,17 @@ export function sha256(input: string): string {
 
 function normalizeAlgorithm(
   algorithm: Algorithm,
-): Algorithm.MD5 | Algorithm.SHA_256 {
+): Algorithm.MD5 | Algorithm.SHA_256 | Algorithm.SHA_512_256 {
   switch (algorithm) {
     case Algorithm.MD5sess: {
       return Algorithm.MD5;
     }
     case Algorithm.SHA_256sess: {
       return Algorithm.SHA_256;
+    }
+
+    case Algorithm.SHA_512_256sess: {
+      return Algorithm.SHA_512_256;
     }
 
     default: {
