@@ -70,9 +70,7 @@ export class Digest implements Authentication {
   scheme = "Digest";
 
   #staticOptions: AuthParams;
-  #hash: (input: string) => string | Promise<string>;
   #algorithm: `${Algorithm}`;
-  #sess: boolean;
   #nonce: () => string | Promise<string>;
 
   constructor(
@@ -100,8 +98,6 @@ export class Digest implements Authentication {
 
     this.#staticOptions = omitBy(params, isUndefined);
     this.#algorithm = algorithm ?? Algorithm.MD5;
-    this.#hash = Supported[normalizeAlgorithm(this.#algorithm as Algorithm)];
-    this.#sess = this.#algorithm.endsWith("sess");
     this.#nonce = nonce;
   }
 
@@ -129,7 +125,7 @@ export class Digest implements Authentication {
     }
 
     const method = request.method;
-    const res = await calculateResponse({
+    const res = calculateResponse({
       cnonce: unq(cnonce),
       method,
       nc: unq(nc),
@@ -139,10 +135,10 @@ export class Digest implements Authentication {
       secret: maybeUser.password,
       uri: unq(uri),
       username: maybeUser.username,
-      hash: this.#hash.bind(this),
-    }, { sess: this.#sess });
+      algorithm,
+    });
 
-    return unq(response) === res;
+    return timingSafeEqual(unq(response), res);
   }
 
   async challenge(): Promise<string> {
@@ -190,8 +186,19 @@ export function sha512_256(input: string): string {
   );
 }
 
-async function calculateResponse(
-  { method, uri, username, realm, secret, hash, nonce, nc, cnonce, qop }: {
+function calculateResponse(
+  {
+    method,
+    uri,
+    username,
+    realm,
+    secret,
+    nonce,
+    nc,
+    cnonce,
+    qop,
+    algorithm,
+  }: {
     username: string;
     nonce: string;
     secret: string;
@@ -201,34 +208,33 @@ async function calculateResponse(
     nc: string;
     cnonce: string;
     qop: string;
-    hash: (input: string) => string | Promise<string>;
+    algorithm: `${Algorithm}`;
   },
-  options?: { sess?: boolean },
-): Promise<string> {
+): string {
+  const sess = algorithm.endsWith("sess");
+  const H = Supported[normalizeAlgorithm(algorithm as Algorithm)];
   const _A1 = concat(username, ":", realm, ":", secret);
-  const A1 = options?.sess
-    ? concat(await hash(_A1), ":", nonce, ":", cnonce)
-    : _A1;
+  const A1 = sess ? concat(H(_A1), ":", nonce, ":", cnonce) : _A1;
   const A2 = `${method}:${uri}`;
 
   /** Calculate key for digest.
    * @see [RFC 7616, 3.3.  The WWW-Authenticate Response Header Field](https://datatracker.ietf.org/doc/html/rfc7616#section-3.3)
    */
-  function KD(secret: string, data: string) {
-    return hash(concat(secret, ":", data));
+  function KD(secret: string, data: string): string {
+    return H(concat(secret, ":", data));
   }
 
-  const response = await KD(
-    await hash(A1),
-    concat(nonce, ":", nc, ":", cnonce, ":", qop, ":", await hash(A2)),
+  const response = KD(
+    H(A1),
+    `${nonce}:${nc}:${cnonce}:${qop}:${H(A2)}`,
   );
 
   return response;
 }
 
-export async function sha256(input: string): Promise<string> {
+export function sha256(input: string): string {
   return toHashString(
-    await crypto.subtle.digest(
+    Crypto.subtle.digestSync(
       Algorithm.SHA_256,
       new TextEncoder().encode(input),
     ),

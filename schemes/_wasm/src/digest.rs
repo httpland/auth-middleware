@@ -6,6 +6,7 @@ use digest::{
 #[derive(Clone)]
 pub enum Context {
   Md5(Box<md5::Md5>),
+  Sha256(Box<sha2::Sha256>),
   Sha512_256(Box<sha2::Sha512_256>),
 }
 
@@ -15,6 +16,7 @@ impl Context {
   pub fn new(algorithm_name: &str) -> Result<Context, &'static str> {
     Ok(match algorithm_name {
       "MD5" => Md5(Default::default()),
+      "SHA-256" => Sha256(Default::default()),
       "SHA-512-256" => Sha512_256(Default::default()),
       _ => return Err("unsupported algorithm"),
     })
@@ -30,6 +32,7 @@ impl Context {
 
     match self {
       Md5(context) => static_block_length(&**context),
+      Sha256(context) => static_block_length(&**context),
       Sha512_256(context) => static_block_length(&**context),
     }
   }
@@ -40,6 +43,7 @@ impl Context {
   pub fn output_length(&self) -> usize {
     match self {
       Md5(context) => context.output_size(),
+      Sha256(context) => context.output_size(),
       Sha512_256(context) => context.output_size(),
     }
   }
@@ -53,6 +57,7 @@ impl Context {
   pub const fn algorithm_name(&self) -> &'static str {
     match self {
       Md5(_) => "MD5",
+      Sha256(_) => "SHA-256",
       Sha512_256(_) => "SHA-512-256",
     }
   }
@@ -60,6 +65,7 @@ impl Context {
   pub fn reset(&mut self) {
     match self {
       Md5(context) => Reset::reset(&mut **context),
+      Sha256(context) => Reset::reset(&mut **context),
       Sha512_256(context) => Reset::reset(&mut **context),
     };
   }
@@ -67,6 +73,7 @@ impl Context {
   pub fn update(&mut self, data: &[u8]) {
     match self {
       Md5(context) => Digest::update(&mut **context, data),
+      Sha256(context) => Digest::update(&mut **context, data),
       Sha512_256(context) => Digest::update(&mut **context, data),
     };
   }
@@ -85,6 +92,7 @@ impl Context {
 
     Ok(match self {
       Md5(context) => context.finalize(),
+      Sha256(context) => context.finalize(),
       Sha512_256(context) => context.finalize(),
     })
   }
@@ -103,6 +111,7 @@ impl Context {
 
     Ok(match self {
       Md5(context) => DynDigest::finalize_reset(context.as_mut()),
+      Sha256(context) => DynDigest::finalize_reset(context.as_mut()),
       Sha512_256(context) => DynDigest::finalize_reset(context.as_mut()),
     })
   }

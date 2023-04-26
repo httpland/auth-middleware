@@ -4,6 +4,9 @@ import {
 
 export const digestAlgorithms = [
   "MD5",
+  // Support for sync digest.
+  // Crypto subtle digest API is Async function.
+  "SHA-256",
   "SHA-512-256",
 ] as const;
 
