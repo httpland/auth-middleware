@@ -1,0 +1,28 @@
+{
+  "tasks": {
+    "test": "deno test --import-map=./_test_import_map.json --doc",
+    "build:npm": "deno run -A _tools/build_npm.ts",
+    "build:crypto": "deno task --cwd schemes/_wasm wasmbuild",
+    "wasmbuild": "deno run -A https://deno.land/x/wasmbuild@0.11.0/main.ts --js-ext mjs --sync"
+  },
+  "fmt": {
+    "files": {
+      "exclude": ["CHANGELOG.md", "CODE_OF_CONDUCT.md"]
+    }
+  },
+  "lint": {
+    "files": {
+      "exclude": ["CHANGELOG.md", "CODE_OF_CONDUCT.md"]
+    }
+  },
+  "test": {
+    "files": {
+      "exclude": ["CHANGELOG.md", "CODE_OF_CONDUCT.md"]
+    }
+  },
+  "compilerOptions": {
+    "noImplicitReturns": true,
+    "noImplicitOverride": true,
+    "noUncheckedIndexedAccess": true
+  }
+}
