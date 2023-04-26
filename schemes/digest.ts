@@ -88,7 +88,7 @@ export class Digest implements Authentication {
     const params: Omit<DigestRequestParams, "nonce"> = {
       charset,
       realm: quoted(realm),
-      qop: "auth",
+      qop: `"auth"`,
       algorithm,
       opaque: isString(opaque) ? quoted(opaque) : undefined,
       domain: domain && quoted(domain.join(" ")),
@@ -265,7 +265,6 @@ function normalizeAlgorithm(
 
 interface DigestParams extends Realm {
   readonly nonce: Quoted;
-  readonly qop: string;
   readonly opaque?: Quoted;
 }
 
@@ -273,6 +272,7 @@ interface DigestRequestParams extends DigestParams {
   readonly algorithm?: `${Algorithm}`;
   readonly charset?: "UTF-8";
   readonly domain?: Quoted;
+  readonly qop: Quoted;
 }
 
 export interface DigestResponseParams extends DigestParams {
@@ -281,6 +281,7 @@ export interface DigestResponseParams extends DigestParams {
   readonly uri: Quoted;
   readonly cnonce: Quoted;
   readonly nc: string;
+  readonly qop: string;
 }
 
 function isDigestResponseParams(

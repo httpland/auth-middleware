@@ -141,21 +141,21 @@ describe("Digest", () => {
   it("should return default challenge", async () => {
     assertEquals(
       await new Digest(() => {}, { nonce }).challenge(),
-      `Digest realm="Secure area", qop=auth, nonce="test"`,
+      `Digest realm="Secure area", qop="auth", nonce="test"`,
     );
   });
 
   it("should add opaque param", async () => {
     assertEquals(
       await new Digest(() => {}, { nonce, opaque: "opaque" }).challenge(),
-      `Digest realm="Secure area", qop=auth, opaque="opaque", nonce="test"`,
+      `Digest realm="Secure area", qop="auth", opaque="opaque", nonce="test"`,
     );
   });
 
   it("should add charset param", async () => {
     assertEquals(
       await new Digest(() => {}, { nonce, charset: "UTF-8" }).challenge(),
-      `Digest charset=UTF-8, realm="Secure area", qop=auth, nonce="test"`,
+      `Digest charset=UTF-8, realm="Secure area", qop="auth", nonce="test"`,
     );
   });
 
@@ -163,7 +163,7 @@ describe("Digest", () => {
     assertEquals(
       await new Digest(() => {}, { nonce, domain: ["/admin", "/secure"] })
         .challenge(),
-      `Digest realm="Secure area", qop=auth, domain="/admin /secure", nonce="test"`,
+      `Digest realm="Secure area", qop="auth", domain="/admin /secure", nonce="test"`,
     );
   });
 
@@ -171,7 +171,7 @@ describe("Digest", () => {
     assertEquals(
       await new Digest(() => {}, { nonce, realm: "secure@localhost" })
         .challenge(),
-      `Digest realm="secure@localhost", qop=auth, nonce="test"`,
+      `Digest realm="secure@localhost", qop="auth", nonce="test"`,
     );
   });
 
@@ -179,7 +179,7 @@ describe("Digest", () => {
     assertEquals(
       await new Digest(() => {}, { nonce, algorithm: "MD5" })
         .challenge(),
-      `Digest realm="Secure area", qop=auth, algorithm=MD5, nonce="test"`,
+      `Digest realm="Secure area", qop="auth", algorithm=MD5, nonce="test"`,
     );
   });
 });
