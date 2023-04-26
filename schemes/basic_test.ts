@@ -37,7 +37,10 @@ describe("Basic", () => {
     const basic = new Basic(authorizer);
 
     assert(await basic.authenticate(btoa("admin:123456")));
-    assertSpyCallArgs(authorizer, 0, [{ name: "admin", password: "123456" }]);
+    assertSpyCallArgs(authorizer, 0, [{
+      username: "admin",
+      password: "123456",
+    }]);
   });
 
   it("should return false when the user pass matched", async () => {

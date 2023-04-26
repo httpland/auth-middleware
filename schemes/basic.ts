@@ -10,15 +10,7 @@ import {
 } from "../deps.ts";
 import { omitBy, quoted } from "../utils.ts";
 import { DEFAULT_REALM } from "../constants.ts";
-import type { Authentication, AuthParameters, Realm } from "../types.ts";
-
-export interface User {
-  /** The user name. */
-  readonly name: string;
-
-  /** The user password. */
-  readonly password: string;
-}
+import type { Authentication, AuthParameters, Realm, User } from "../types.ts";
 
 export interface Authorizer {
   (user: User): boolean | Promise<boolean>;
@@ -80,7 +72,10 @@ export class Basic implements Authentication {
     if (isErr(resultUserPass)) return false;
 
     const userPass = resultUserPass.value;
-    const user: User = { name: userPass.userId, password: userPass.password };
+    const user: User = {
+      username: userPass.userId,
+      password: userPass.password,
+    };
 
     return await this.authorizer(user);
   }
