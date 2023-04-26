@@ -38,7 +38,7 @@ export interface DigestOptions {
   readonly realm?: string;
 
   /** Calculate nonce. */
-  readonly nonce?: () => string;
+  readonly nonce?: () => string | Promise<string>;
 
   // TODO:(miyauci) Support this field.
   // readonly opaque?: string;
@@ -66,7 +66,7 @@ export class Digest implements Authentication {
   #hash: (input: string) => string | Promise<string>;
   #algorithm: `${Algorithm}`;
   #sess: boolean;
-  #nonce: () => string;
+  #nonce: () => string | Promise<string>;
 
   constructor(
     public readonly authorizer: (
@@ -136,8 +136,8 @@ export class Digest implements Authentication {
     return unq(response) === res;
   }
 
-  challenge(): string {
-    const nonce = this.#nonce();
+  async challenge(): Promise<string> {
+    const nonce = await this.#nonce();
     const challenge = stringifyChallenge({
       authScheme: this.scheme,
       params: { ...this.#staticOptions, nonce: quoted(nonce) },
