@@ -41,7 +41,12 @@ export interface DigestOptions {
   readonly nonce?: () => string | Promise<string>;
 
   // TODO:(miyauci) Support this field.
-  // readonly opaque?: string;
+
+  /** A string of data, specified by the server.
+   * It is recommended that this string be Base64 or hexadecimal data.
+   */
+  readonly opaque?: string;
+
   // readonly stale?: boolean;
   // readonly domain?: string[];
   readonly qop?: readonly QOP[];
@@ -55,6 +60,7 @@ interface DigestArgs extends Realm {
   readonly nonce: Quoted;
   readonly qop: string;
   readonly charset?: "UTF-8";
+  readonly opaque?: Quoted;
 }
 
 type QOP = "auth" | "auth-init";
@@ -80,19 +86,20 @@ export class Digest implements Authentication {
       algorithm,
       charset,
       nonce = calculateNonce,
+      opaque,
     } = options;
     const params: Omit<DigestArgs, "nonce"> = {
       charset,
       realm: quoted(realm),
       qop: qop.join(", "),
       algorithm,
+      opaque: isString(opaque) ? quoted(opaque) : undefined,
     };
-    const algo = algorithm ?? Algorithm.MD5;
 
     this.#staticOptions = omitBy(params, isUndefined);
-    this.#algorithm = algo;
-    this.#hash = Supported[normalizeAlgorithm(algo as Algorithm)];
-    this.#sess = algo.endsWith("sess");
+    this.#algorithm = algorithm ?? Algorithm.MD5;
+    this.#hash = Supported[normalizeAlgorithm(this.#algorithm as Algorithm)];
+    this.#sess = this.#algorithm.endsWith("sess");
     this.#nonce = nonce;
   }
 
@@ -164,16 +171,6 @@ export function unq(input: string): string {
 
 function calculateNonce(): string {
   return btoa(crypto.randomUUID());
-}
-
-export function calcA1(
-  { username, realm, passwd }: {
-    username: string;
-    realm: string;
-    passwd: string;
-  },
-): string {
-  return concat(username, ":", unq(realm), ":", passwd);
 }
 
 export function md5(input: string): string {
