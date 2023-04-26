@@ -8,9 +8,15 @@ import {
   stringifyChallenge,
   toHashString,
 } from "../deps.ts";
-import { concat, omitBy, type Quoted, quoted } from "../utils.ts";
+import {
+  concat,
+  omitBy,
+  type Quoted,
+  quoted,
+  timingSafeEqual,
+} from "../utils.ts";
 import { Char, DEFAULT_REALM } from "../constants.ts";
-import type { Authentication, Parameters, Realm } from "../types.ts";
+import type { Authentication, Parameters, Realm, User } from "../types.ts";
 import { Crypto } from "./_wasm/mod.ts";
 
 const enum Algorithm {
@@ -63,7 +69,9 @@ export class Digest implements Authentication {
   #nonce: () => string;
 
   constructor(
-    public users: Readonly<Record<string, string>>,
+    public readonly authorizer: (
+      username: string,
+    ) => User | void | Promise<User | void>,
     public readonly options: DigestOptions = {},
   ) {
     const {
@@ -104,29 +112,28 @@ export class Digest implements Authentication {
 
     if (algorithm !== this.#algorithm) return false;
 
+    const username = unq(token.username);
+    const maybeUser = await this.authorizer(username);
+
+    if (!maybeUser || !timingSafeEqual(username, maybeUser.username)) {
+      return false;
+    }
+
     const method = request.method;
-    const a1List = await Promise.all(
-      Object.entries(this.users).map(async ([username, passwd]) => {
-        const A1 = calcA1({ username, realm, passwd });
+    const res = await calculateResponse({
+      cnonce: unq(cnonce),
+      method,
+      nc: unq(nc),
+      nonce: unq(nonce),
+      qop,
+      realm: unq(realm),
+      secret: maybeUser.password,
+      uri: unq(uri),
+      username: maybeUser.username,
+      hash: this.#hash.bind(this),
+    }, { sess: this.#sess });
 
-        const a1 = this.#sess
-          ? `${await this.#hash(A1)}:${unq(nonce)}:${unq(cnonce)}`
-          : A1;
-
-        return a1;
-      }),
-    );
-    const A2 = `${method}:${unq(uri)}`;
-    const hashList = await Promise.all(a1List.map(async (A1) =>
-      quoted(
-        await this.#KD(
-          await this.#H(A1),
-          `${unq(nonce)}:${nc}:${unq(cnonce)}:${unq(qop)}:${await this.#H(A2)}`,
-        ),
-      )
-    ));
-
-    return hashList.includes(response);
+    return unq(response) === res;
   }
 
   challenge(): string {
@@ -137,20 +144,6 @@ export class Digest implements Authentication {
     });
 
     return challenge;
-  }
-
-  /**
-   * @see [RFC 7616, 3.3.  The WWW-Authenticate Response Header Field](https://datatracker.ietf.org/doc/html/rfc7616#section-3.3)
-   */
-  #H(data: string): string | Promise<string> {
-    return this.#hash(data);
-  }
-
-  /** Calculate key for digest.
-   * @see [RFC 7616, 3.3.  The WWW-Authenticate Response Header Field](https://datatracker.ietf.org/doc/html/rfc7616#section-3.3)
-   */
-  #KD(secret: string, data: string): string | Promise<string> {
-    return this.#H(concat(secret, ":", data));
   }
 }
 
@@ -196,6 +189,42 @@ export function sha512_256(input: string): string {
       new TextEncoder().encode(input),
     ),
   );
+}
+
+async function calculateResponse(
+  { method, uri, username, realm, secret, hash, nonce, nc, cnonce, qop }: {
+    username: string;
+    nonce: string;
+    secret: string;
+    method: string;
+    uri: string;
+    realm: string;
+    nc: string;
+    cnonce: string;
+    qop: string;
+    hash: (input: string) => string | Promise<string>;
+  },
+  options?: { sess?: boolean },
+): Promise<string> {
+  const _A1 = concat(username, ":", realm, ":", secret);
+  const A1 = options?.sess
+    ? concat(await hash(_A1), ":", nonce, ":", cnonce)
+    : _A1;
+  const A2 = `${method}:${uri}`;
+
+  /** Calculate key for digest.
+   * @see [RFC 7616, 3.3.  The WWW-Authenticate Response Header Field](https://datatracker.ietf.org/doc/html/rfc7616#section-3.3)
+   */
+  function KD(secret: string, data: string) {
+    return hash(concat(secret, ":", data));
+  }
+
+  const response = await KD(
+    await hash(A1),
+    concat(nonce, ":", nc, ":", cnonce, ":", qop, ":", await hash(A2)),
+  );
+
+  return response;
 }
 
 export async function sha256(input: string): Promise<string> {
