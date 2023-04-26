@@ -28,6 +28,7 @@ const enum Algorithm {
   SHA_512_256sess = `${Algorithm.SHA_512_256}-sess`,
 }
 
+/** Digest options. */
 export interface DigestOptions {
   /** Algorithm. */
   readonly algorithm?: `${Algorithm}`;
@@ -45,15 +46,15 @@ export interface DigestOptions {
    */
   readonly opaque?: string;
 
-  // TODO:(miyauci) Support this field.
-  // readonly stale?: boolean;
-
   /** Protection space specified with URI. */
   readonly domain?: string[];
-  readonly qop?: readonly QOP[];
 
   /** Encoding scheme. */
   readonly charset?: "UTF-8";
+
+  // TODO:(miyauci) support features
+  // readonly qop?: readonly QOP[];
+  // readonly userhash?: boolean
 }
 
 interface DigestArgs extends Realm {
@@ -64,8 +65,6 @@ interface DigestArgs extends Realm {
   readonly opaque?: Quoted;
   readonly domain?: Quoted;
 }
-
-type QOP = "auth" | "auth-init";
 
 export class Digest implements Authentication {
   scheme = "Digest";
@@ -83,7 +82,6 @@ export class Digest implements Authentication {
     public readonly options: DigestOptions = {},
   ) {
     const {
-      qop = ["auth"],
       realm = DEFAULT_REALM,
       algorithm,
       charset,
@@ -94,7 +92,7 @@ export class Digest implements Authentication {
     const params: Omit<DigestArgs, "nonce"> = {
       charset,
       realm: quoted(realm),
-      qop: qop.join(", "),
+      qop: "auth",
       algorithm,
       opaque: isString(opaque) ? quoted(opaque) : undefined,
       domain: domain && quoted(domain.join(" ")),
