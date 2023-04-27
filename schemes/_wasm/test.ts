@@ -28,7 +28,7 @@ describe("digestSync", () => {
 
   it("should work SHA-256 hashing", () => {
     const result = Crypto.subtle.digestSync(
-      'SHA-256',
+      "SHA-256",
       new TextEncoder().encode(Sha256.input),
     );
 
