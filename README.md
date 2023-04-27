@@ -51,7 +51,6 @@ import {
   auth,
   Basic,
   type Handler,
-  timingSafeEqual,
   type User,
 } from "https://deno.land/x/auth_middleware@$VERSION/mod.ts";
 import { assert } from "https://deno.land/std/testing/asserts.ts";
@@ -63,8 +62,8 @@ declare const handler: Handler;
 
 const middleware = auth(
   new Basic(({ username, password }) => {
-    const userResult = timingSafeEqual(username, admin.username);
-    const passResult = timingSafeEqual(password, admin.password);
+    const userResult = Basic.timingSafeEqual(username, admin.username);
+    const passResult = Basic.timingSafeEqual(password, admin.password);
 
     return userResult && passResult;
   }),

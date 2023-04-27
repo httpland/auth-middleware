@@ -9,6 +9,5 @@ export {
   type DigestOptions,
   type SelectUser,
 } from "./schemes/digest.ts";
-export { timingSafeEqual } from "./utils.ts";
 export type { Authentication, User } from "./types.ts";
 export { type Handler, type Middleware } from "./deps.ts";

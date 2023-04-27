@@ -8,6 +8,7 @@ import {
   it,
   spy,
 } from "../_dev_deps.ts";
+import { timingSafeEqual } from "../utils.ts";
 
 describe("Basic", () => {
   it("should contain property", () => {
@@ -15,6 +16,10 @@ describe("Basic", () => {
 
     assertEquals(basic.scheme, "Basic");
     assertEquals(basic.challenge(), `Basic realm="Secure area"`);
+  });
+
+  it("should provide timing safe equal", () => {
+    assertEquals(Basic.timingSafeEqual, timingSafeEqual);
   });
 
   it("should change realm", () => {

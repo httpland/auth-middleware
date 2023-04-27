@@ -8,7 +8,7 @@ import {
   stringifyChallenge,
   unsafe,
 } from "../deps.ts";
-import { omitBy, quoted } from "../utils.ts";
+import { omitBy, quoted, timingSafeEqual } from "../utils.ts";
 import { DEFAULT_REALM } from "../constants.ts";
 import type { Authentication, AuthParameters, Realm, User } from "../types.ts";
 
@@ -83,6 +83,8 @@ export class Basic implements Authentication {
   challenge(): string {
     return this.#wwwAuthenticate;
   }
+
+  static timingSafeEqual = timingSafeEqual;
 }
 
 /** @see https://www.rfc-editor.org/rfc/rfc7617#section-2 */
