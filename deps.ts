@@ -18,5 +18,5 @@ export {
   parseAuthorization,
   stringifyAuthorization as stringifyChallenge,
   type Token68,
-} from "https://deno.land/x/authorization_parser@1.0.0-beta.2/mod.ts";
+} from "https://deno.land/x/authorization_parser@1.0.0/mod.ts";
 export { isErr, unsafe } from "https://deno.land/x/result_js@1.0.0/mod.ts";

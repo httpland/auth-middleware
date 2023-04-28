@@ -70,9 +70,9 @@ export const makeOptions = (version: string): BuildOptions => ({
       version: "1.0.0",
       subPath: "header.js",
     },
-    "https://deno.land/x/authorization_parser@1.0.0-beta.2/mod.ts": {
+    "https://deno.land/x/authorization_parser@1.0.0/mod.ts": {
       name: "@httpland/authorization-parser",
-      version: "1.0.0-beta.2",
+      version: "1.0.0",
     },
     "https://deno.land/x/result_js@1.0.0/mod.ts": {
       name: "@miyauci/result",
