@@ -18,7 +18,6 @@ import {
 } from "../utils.ts";
 import { Char, DEFAULT_REALM } from "../constants.ts";
 import type {
-  AuthContext,
   Authentication,
   AuthParamsContext,
   Realm,
