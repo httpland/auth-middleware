@@ -9,14 +9,21 @@ export interface Authentication {
   /** The authentication scheme. */
   readonly scheme: string;
 
-  challenge: (request: Request) => string | Promise<string>;
-  authenticate: (
-    params: AuthParameters,
-    request: Request,
-  ) => boolean | Promise<boolean>;
+  challenge: (context: CommonAuthContext) => string | Promise<string>;
+
+  authenticate: (context: AuthContext) => boolean | Promise<boolean>;
 }
 
-export type AuthParameters = AuthParams | Token68;
+export interface AuthParamsContext {
+  readonly authScheme: string;
+  readonly params: AuthParams | Token68 | null;
+}
+
+export interface CommonAuthContext {
+  readonly request: Request;
+}
+
+export interface AuthContext extends AuthParamsContext, CommonAuthContext {}
 
 export interface Realm {
   /** Realm. */

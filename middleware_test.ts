@@ -89,7 +89,7 @@ describe("auth", () => {
     );
 
     assertSpyCalls(handler, 0);
-    assertSpyCalls(authenticate, 0);
+    assertSpyCalls(authenticate, 1);
     assertSpyCalls(challenge, 1);
 
     assert(

@@ -3,6 +3,7 @@
 
 import {
   AuthParams,
+  isObject,
   isString,
   isUndefined,
   stringifyChallenge,
@@ -16,7 +17,13 @@ import {
   timingSafeEqual,
 } from "../utils.ts";
 import { Char, DEFAULT_REALM } from "../constants.ts";
-import type { Authentication, AuthParameters, Realm, User } from "../types.ts";
+import type {
+  AuthContext,
+  Authentication,
+  AuthParamsContext,
+  Realm,
+  User,
+} from "../types.ts";
 import { Crypto } from "./_wasm/mod.ts";
 
 const enum Algorithm {
@@ -57,7 +64,7 @@ export interface DigestOptions {
 
   // TODO:(miyauci) support features
   // readonly qop?: readonly QOP[];
-  // readonly userhash?: boolean
+  // readonly userhash?: boolean;
 }
 
 /** User selection API. */
@@ -65,6 +72,7 @@ export interface SelectUser {
   (username: string): User | void | Promise<User | void>;
 }
 
+/** HTTP Digest authentication. */
 export class Digest implements Authentication {
   scheme = "Digest";
 
@@ -101,10 +109,13 @@ export class Digest implements Authentication {
   }
 
   async authenticate(
-    params: AuthParameters,
-    request: { readonly method: string },
+    context:
+      & { readonly request: Pick<Request, "method"> }
+      & Pick<AuthParamsContext, "params">,
   ): Promise<boolean> {
-    if (isString(params) || !isDigestResponseParams(params)) return false;
+    const { request, params } = context;
+
+    if (!isObject(params) || !isDigestResponseParams(params)) return false;
 
     const {
       nc,
@@ -126,10 +137,9 @@ export class Digest implements Authentication {
       return false;
     }
 
-    const { method } = request;
     const res = calculateResponse({
       cnonce: unq(cnonce),
-      method,
+      method: request.method,
       nc: unq(nc),
       nonce: unq(nonce),
       qop,
@@ -243,10 +253,7 @@ export function calculateResponse(context: {
     return H(concat(secret, ":", data));
   }
 
-  const response = KD(
-    H(A1),
-    `${nonce}:${nc}:${cnonce}:${qop}:${H(A2)}`,
-  );
+  const response = KD(H(A1), `${nonce}:${nc}:${cnonce}:${qop}:${H(A2)}`);
 
   return response;
 }

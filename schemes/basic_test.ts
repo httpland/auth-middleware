@@ -41,7 +41,7 @@ describe("Basic", () => {
     const authorizer = spy(() => true);
     const basic = new Basic(authorizer);
 
-    assert(await basic.authenticate(btoa("admin:123456")));
+    assert(await basic.authenticate({ params: btoa("admin:123456") }));
     assertSpyCallArgs(authorizer, 0, [{
       username: "admin",
       password: "123456",
@@ -52,7 +52,7 @@ describe("Basic", () => {
     const authorizer = spy(() => false);
     const basic = new Basic(authorizer);
 
-    assert(!await basic.authenticate(btoa("admin:123456")));
+    assert(!await basic.authenticate({ params: btoa("admin:123456") }));
   });
 
   it("should throw error if the options is invalid", () => {

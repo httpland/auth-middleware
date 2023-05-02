@@ -5,7 +5,6 @@ import {
   AuthenticationHeader,
   type Handler,
   isErr,
-  isNull,
   isString,
   type Middleware,
   parseAuthorization,
@@ -44,14 +43,15 @@ export async function _auth(
 
   for (const authentication of authentications) {
     // Case insensitive @see https://www.rfc-editor.org/rfc/rfc9110.html#section-11.1
-    if (
-      isNull(params) ||
-      !equalsCaseInsensitive(authentication.scheme, authScheme)
-    ) {
+    if (!equalsCaseInsensitive(authentication.scheme, authScheme)) {
       continue;
     }
 
-    const pass = await authentication.authenticate(params, request);
+    const pass = await authentication.authenticate({
+      params,
+      request,
+      authScheme,
+    });
 
     if (pass) return next(request);
   }
@@ -60,7 +60,7 @@ export async function _auth(
 
   async function respond(): Promise<Response> {
     const wwwAuthenticate = (await Promise.all(
-      authentications.map((auth) => auth.challenge(request)),
+      authentications.map((auth) => auth.challenge({ request })),
     ))
       .join(", ");
     const headers = { [AuthenticationHeader.WWWAuthenticate]: wwwAuthenticate };

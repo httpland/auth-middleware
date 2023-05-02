@@ -42,14 +42,18 @@ describe("Digest", () => {
   });
 
   it("should return false if the params is string", async () => {
-    const result = await new Digest(() => {}).authenticate("", { method: "" });
+    const result = await new Digest(() => {}).authenticate({
+      request: { method: "" },
+      params: "",
+    });
     assertFalse(result);
   });
 
   it("should return false if the params is not digest response", async () => {
     const selectUser = spy(() => {});
-    const result = await new Digest(selectUser).authenticate({}, {
-      method: "",
+    const result = await new Digest(selectUser).authenticate({
+      request: { method: "" },
+      params: {},
     });
 
     assertSpyCalls(selectUser, 0);
@@ -70,10 +74,13 @@ describe("Digest", () => {
   it("should return false if the algorithm is not supported", async () => {
     const selectUser = spy(() => {});
     const result = await new Digest(selectUser).authenticate({
-      ...params,
-      algorithm: "unknown",
-    }, {
-      method: "",
+      request: {
+        method: "",
+      },
+      params: {
+        ...params,
+        algorithm: "unknown",
+      },
     });
 
     assertSpyCalls(selectUser, 0);
@@ -82,8 +89,11 @@ describe("Digest", () => {
 
   it("should return false if the selected user does not match", async () => {
     const selectUser = spy(() => {});
-    const result = await new Digest(selectUser).authenticate({ ...params }, {
-      method: "",
+    const result = await new Digest(selectUser).authenticate({
+      request: {
+        method: "",
+      },
+      params: { ...params },
     });
 
     assertSpyCalls(selectUser, 1);
@@ -92,8 +102,11 @@ describe("Digest", () => {
 
   it("should return false if the selected user name does not match", async () => {
     const selectUser = spy(() => ({ username: "", password: "" }));
-    const result = await new Digest(selectUser).authenticate({ ...params }, {
-      method: "",
+    const result = await new Digest(selectUser).authenticate({
+      request: {
+        method: "",
+      },
+      params: { ...params },
     });
 
     assertSpyCalls(selectUser, 1);
@@ -120,11 +133,9 @@ describe("Digest", () => {
     const selectUser = spy(() => ({ username, password }));
     const result = await new Digest(selectUser)
       .authenticate({
-        ...params,
-        algorithm,
-        response,
-        username: `"${username}"`,
-      }, { method });
+        params: { ...params, algorithm, response, username: `"${username}"` },
+        request: { method },
+      });
 
     assertSpyCalls(selectUser, 1);
     assert(result);
@@ -132,9 +143,12 @@ describe("Digest", () => {
 
   it("should return false if the algorithm is not supported", async () => {
     const result = await new Digest(() => {}).authenticate({
-      ...params,
-      algorithm: "unknown",
-    }, { method: "" });
+      params: {
+        ...params,
+        algorithm: "unknown",
+      },
+      request: { method: "" },
+    });
     assertFalse(result);
   });
 
