@@ -65,14 +65,14 @@ export const makeOptions = (version: string): BuildOptions => ({
       version: "1.3.1",
       subPath: "is_null.js",
     },
-    "https://deno.land/x/http_utils@1.0.0/header.ts": {
+    "https://deno.land/x/http_utils@1.2.0/header.ts": {
       name: "@httpland/http-utils",
-      version: "1.0.0",
+      version: "1.2.0",
       subPath: "header.js",
     },
-    "https://deno.land/x/authorization_parser@1.0.0/mod.ts": {
+    "https://deno.land/x/authorization_parser@1.1.0/mod.ts": {
       name: "@httpland/authorization-parser",
-      version: "1.0.0",
+      version: "1.1.0",
     },
     "https://deno.land/x/result_js@1.0.0/mod.ts": {
       name: "@miyauci/result",

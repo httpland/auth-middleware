@@ -9,14 +9,15 @@ export { timingSafeEqual } from "https://deno.land/std@0.184.0/crypto/timing_saf
 export { toHashString } from "https://deno.land/std@0.184.0/crypto/to_hash_string.ts";
 export { Status } from "https://deno.land/std@0.184.0/http/http_status.ts";
 export { isString } from "https://deno.land/x/isx@1.3.1/is_string.ts";
+export { isObject } from "https://deno.land/x/isx@1.3.1/is_object.ts";
 export { isBoolean } from "https://deno.land/x/isx@1.3.1/is_boolean.ts";
 export { isUndefined } from "https://deno.land/x/isx@1.3.1/is_undefined.ts";
 export { isNull } from "https://deno.land/x/isx@1.3.1/is_null.ts";
-export { AuthenticationHeader } from "https://deno.land/x/http_utils@1.0.0/header.ts";
+export { AuthenticationHeader } from "https://deno.land/x/http_utils@1.2.0/header.ts";
 export {
   type AuthParams,
   parseAuthorization,
   stringifyAuthorization as stringifyChallenge,
   type Token68,
-} from "https://deno.land/x/authorization_parser@1.0.0/mod.ts";
+} from "https://deno.land/x/authorization_parser@1.1.0/mod.ts";
 export { isErr, unsafe } from "https://deno.land/x/result_js@1.0.0/mod.ts";
