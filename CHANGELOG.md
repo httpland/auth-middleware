@@ -1,3 +1,12 @@
+# [1.0.0-beta.2](https://github.com/httpland/auth-middleware/compare/1.0.0-beta.1...1.0.0-beta.2) (2023-05-02)
+
+
+### Features
+
+* **basic:** provide timing safe equal ([1c030cd](https://github.com/httpland/auth-middleware/commit/1c030cd6e4f4ca3dc4c033958af3b0d4bbd4ddc2))
+* **deps:** update deps version ([46d463d](https://github.com/httpland/auth-middleware/commit/46d463d57df9899b47727b6266dca423afe38fa5))
+* **types:** change authentication interface ([6ceba10](https://github.com/httpland/auth-middleware/commit/6ceba104e1f693b442039f238209759053452f52))
+
 # 1.0.0-beta.1 (2023-04-27)
 
 
