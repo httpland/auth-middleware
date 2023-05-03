@@ -10,15 +10,20 @@ import {
   toHashString,
 } from "../deps.ts";
 import {
+  badRequest,
   concat,
+  err,
+  ok,
   omitBy,
   type Quoted,
   quoted,
   timingSafeEqual,
+  unauthorized,
 } from "../utils.ts";
 import { Char, DEFAULT_REALM } from "../constants.ts";
 import type {
   Authentication,
+  AuthenticationResult,
   AuthParamsContext,
   Realm,
   User,
@@ -33,6 +38,15 @@ const enum Algorithm {
   SHA_512_256 = "SHA-512-256",
   SHA_512_256sess = `${Algorithm.SHA_512_256}-sess`,
 }
+
+const algorithms = [
+  Algorithm.MD5,
+  Algorithm.MD5sess,
+  Algorithm.SHA_256,
+  Algorithm.SHA_256sess,
+  Algorithm.SHA_512_256,
+  Algorithm.SHA_512_256sess,
+];
 
 /** Digest algorithm. */
 export type DigestAlgorithm = `${Algorithm}`;
@@ -111,10 +125,16 @@ export class Digest implements Authentication {
     context:
       & { readonly request: Pick<Request, "method"> }
       & Pick<AuthParamsContext, "params">,
-  ): Promise<boolean> {
+  ): Promise<AuthenticationResult> {
     const { request, params } = context;
 
-    if (!isObject(params) || !isDigestResponseParams(params)) return false;
+    if (!isObject(params)) {
+      return err(badRequest(`Authorization challenge should be valid`));
+    }
+
+    if (!isDigestResponseParams(params)) {
+      return err(badRequest(`auth-param should be valid`));
+    }
 
     const {
       nc,
@@ -127,13 +147,21 @@ export class Digest implements Authentication {
       algorithm = Algorithm.MD5,
     } = params;
 
-    if (!isDigestAlgorithm(algorithm)) return false;
+    if (!isDigestAlgorithm(algorithm)) {
+      return err(
+        badRequest(
+          `auth-param of "algorithm" should be one of ${
+            algorithms.map(quoted).join(", ")
+          }`,
+        ),
+      );
+    }
 
     const username = unq(params.username);
     const maybeUser = await this.#selectUser(username);
 
     if (!maybeUser || !timingSafeEqual(username, maybeUser.username)) {
-      return false;
+      return err(unauthorized(await this.challenge()));
     }
 
     const res = calculateResponse({
@@ -149,7 +177,11 @@ export class Digest implements Authentication {
       algorithm,
     });
 
-    return timingSafeEqual(unq(response), res);
+    const result = timingSafeEqual(unq(response), res);
+
+    if (!result) return err(unauthorized(await this.challenge()));
+
+    return ok();
   }
 
   async challenge(): Promise<string> {

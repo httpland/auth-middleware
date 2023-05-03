@@ -7,12 +7,16 @@ import {
 import {
   assert,
   assertEquals,
-  assertFalse,
+  assertErr,
+  assertOk,
   assertSpyCalls,
   describe,
+  equalsResponse,
   it,
   spy,
+  Status,
 } from "../_dev_deps.ts";
+import { AuthenticationHeader } from "../deps.ts";
 
 describe("unq", () => {
   it("should return unquoted string", () => {
@@ -41,23 +45,45 @@ describe("Digest", () => {
     assertEquals(new Digest(() => {}).scheme, "Digest");
   });
 
-  it("should return false if the params is string", async () => {
-    const result = await new Digest(() => {}).authenticate({
+  it("should return Err(400) if the params is invalid", async () => {
+    const fn = spy(() => {});
+    const result = await new Digest(fn).authenticate({
       request: { method: "" },
       params: "",
     });
-    assertFalse(result);
+
+    assertSpyCalls(fn, 0);
+    assertErr(result);
+    assert(
+      await equalsResponse(
+        result.response,
+        new Response(`Authorization challenge should be valid`, {
+          status: Status.BadRequest,
+        }),
+        true,
+      ),
+    );
   });
 
-  it("should return false if the params is not digest response", async () => {
+  it("should return Err(400) if the params is invalid digest response", async () => {
+    const fn = spy(() => {});
     const selectUser = spy(() => {});
     const result = await new Digest(selectUser).authenticate({
       request: { method: "" },
       params: {},
     });
 
-    assertSpyCalls(selectUser, 0);
-    assertFalse(result);
+    assertSpyCalls(fn, 0);
+    assertErr(result);
+    assert(
+      await equalsResponse(
+        result.response,
+        new Response(`auth-param should be valid`, {
+          status: Status.BadRequest,
+        }),
+        true,
+      ),
+    );
   });
 
   const params: DigestResponseParams = {
@@ -71,7 +97,7 @@ describe("Digest", () => {
     nonce: `""`,
   };
 
-  it("should return false if the algorithm is not supported", async () => {
+  it("should return Err(400) if the algorithm is not supported", async () => {
     const selectUser = spy(() => {});
     const result = await new Digest(selectUser).authenticate({
       request: {
@@ -84,36 +110,78 @@ describe("Digest", () => {
     });
 
     assertSpyCalls(selectUser, 0);
-    assertFalse(result);
+    assertErr(result);
+    assert(
+      await equalsResponse(
+        result.response,
+        new Response(
+          `auth-param of "algorithm" should be one of "MD5", "MD5-sess", "SHA-256", "SHA-256-sess", "SHA-512-256", "SHA-512-256-sess"`,
+          { status: Status.BadRequest },
+        ),
+        true,
+      ),
+    );
   });
 
-  it("should return false if the selected user does not match", async () => {
+  it("should return Err(401) if the selected user does not exist", async () => {
     const selectUser = spy(() => {});
-    const result = await new Digest(selectUser).authenticate({
-      request: {
-        method: "",
-      },
-      params: { ...params },
-    });
+    const nonce = spy(() => "abc");
+    const result = await new Digest(selectUser, { nonce })
+      .authenticate({
+        request: {
+          method: "",
+        },
+        params: { ...params },
+      });
 
     assertSpyCalls(selectUser, 1);
-    assertFalse(result);
+    assertSpyCalls(nonce, 1);
+    assertErr(result);
+    assert(
+      await equalsResponse(
+        result.response,
+        new Response(null, {
+          status: Status.Unauthorized,
+          headers: {
+            [AuthenticationHeader.WWWAuthenticate]:
+              `Digest realm="Secure area", qop="auth", nonce="abc"`,
+          },
+        }),
+        true,
+      ),
+    );
   });
 
-  it("should return false if the selected user name does not match", async () => {
-    const selectUser = spy(() => ({ username: "", password: "" }));
-    const result = await new Digest(selectUser).authenticate({
-      request: {
-        method: "",
-      },
-      params: { ...params },
-    });
+  it("should return Err(401) if the selected user does not match", async () => {
+    const selectUser = spy(() => ({ username: "admin", password: "123456" }));
+    const nonce = spy(() => "abc");
+    const result = await new Digest(selectUser, { nonce })
+      .authenticate({
+        request: {
+          method: "",
+        },
+        params: { ...params, username: `"user"` },
+      });
 
     assertSpyCalls(selectUser, 1);
-    assertFalse(result);
+    assertSpyCalls(nonce, 1);
+    assertErr(result);
+    assert(
+      await equalsResponse(
+        result.response,
+        new Response(null, {
+          status: Status.Unauthorized,
+          headers: {
+            [AuthenticationHeader.WWWAuthenticate]:
+              `Digest realm="Secure area", qop="auth", nonce="abc"`,
+          },
+        }),
+        true,
+      ),
+    );
   });
 
-  it("should return true if the response is matched", async () => {
+  it("should return Ok if the response is matched", async () => {
     const username = "admin";
     const password = "123";
     const method = "GET";
@@ -138,18 +206,7 @@ describe("Digest", () => {
       });
 
     assertSpyCalls(selectUser, 1);
-    assert(result);
-  });
-
-  it("should return false if the algorithm is not supported", async () => {
-    const result = await new Digest(() => {}).authenticate({
-      params: {
-        ...params,
-        algorithm: "unknown",
-      },
-      request: { method: "" },
-    });
-    assertFalse(result);
+    assertOk(result);
   });
 
   it("should return default challenge", async () => {

@@ -8,10 +8,19 @@ import {
   stringifyChallenge,
   unsafe,
 } from "../deps.ts";
-import { omitBy, quoted, timingSafeEqual } from "../utils.ts";
+import {
+  badRequest,
+  err,
+  ok,
+  omitBy,
+  quoted,
+  timingSafeEqual,
+  unauthorized,
+} from "../utils.ts";
 import { DEFAULT_REALM } from "../constants.ts";
 import type {
   Authentication,
+  AuthenticationResult,
   AuthParamsContext,
   Realm,
   User,
@@ -38,6 +47,12 @@ interface BasicAuthParams extends Realm {
 const DEFAULT_AUTH_PARAM = {
   realm: DEFAULT_REALM,
 };
+
+const enum Msg {
+  InvalidChallenge = "Authorization header should be valid challenge",
+  InvalidBase64 = "Authorization challenge should be valid base-64 encoding",
+  InvalidUserPass = "Authorization challenge should be valid user-pass",
+}
 
 /** HTTP Basic Authentication. */
 export class Basic implements Authentication {
@@ -66,19 +81,19 @@ export class Basic implements Authentication {
 
   async authenticate(
     context: Pick<AuthParamsContext, "params">,
-  ): Promise<boolean> {
+  ): Promise<AuthenticationResult> {
     const { params } = context;
 
-    if (!isString(params)) return false;
+    if (!isString(params)) return err(badRequest(Msg.InvalidChallenge));
 
     const b64Result = unsafe(() => atob(params));
 
-    if (isErr(b64Result)) return false;
+    if (isErr(b64Result)) return err(badRequest(Msg.InvalidBase64));
 
     const b64Token = b64Result.value;
     const resultUserPass = unsafe(() => parseUserPass(b64Token));
 
-    if (isErr(resultUserPass)) return false;
+    if (isErr(resultUserPass)) return err(badRequest(Msg.InvalidUserPass));
 
     const userPass = resultUserPass.value;
     const user: User = {
@@ -86,7 +101,11 @@ export class Basic implements Authentication {
       password: userPass.password,
     };
 
-    return await this.authorizer(user);
+    const result = await this.authorizer(user);
+
+    if (!result) return err(unauthorized(this.challenge()));
+
+    return ok();
   }
 
   challenge(): string {

@@ -2,13 +2,18 @@ import { Basic, parseUserPass, type UserPass } from "./basic.ts";
 import {
   assert,
   assertEquals,
+  assertErr,
+  assertOk,
   assertSpyCallArgs,
+  assertSpyCalls,
   assertThrows,
   describe,
+  equalsResponse,
   it,
   spy,
 } from "../_dev_deps.ts";
 import { timingSafeEqual } from "../utils.ts";
+import { AuthenticationHeader, Status } from "../deps.ts";
 
 describe("Basic", () => {
   it("should contain property", () => {
@@ -37,22 +42,96 @@ describe("Basic", () => {
     );
   });
 
-  it("should return true when the user pass matched", async () => {
+  it("should return Ok true when the user pass matched", async () => {
     const authorizer = spy(() => true);
     const basic = new Basic(authorizer);
 
-    assert(await basic.authenticate({ params: btoa("admin:123456") }));
+    assertOk(await basic.authenticate({ params: btoa("admin:123456") }));
     assertSpyCallArgs(authorizer, 0, [{
       username: "admin",
       password: "123456",
     }]);
   });
 
-  it("should return false when the user pass matched", async () => {
+  it("should return Err(400) response when the challenge is invalid", async () => {
     const authorizer = spy(() => false);
     const basic = new Basic(authorizer);
+    const result = await basic.authenticate({ params: {} });
 
-    assert(!await basic.authenticate({ params: btoa("admin:123456") }));
+    assertSpyCalls(authorizer, 0);
+    assertErr(result);
+    assert(
+      await equalsResponse(
+        result.response,
+        new Response("Authorization header should be valid challenge", {
+          status: Status.BadRequest,
+        }),
+        true,
+      ),
+    );
+  });
+
+  it("should return Err(400) response when the challenge is not base64", async () => {
+    const authorizer = spy(() => false);
+    const basic = new Basic(authorizer);
+    const result = await basic.authenticate({ params: "<invalid:base64>" });
+
+    assertSpyCalls(authorizer, 0);
+    assertErr(result);
+    assert(
+      await equalsResponse(
+        result.response,
+        new Response(
+          "Authorization challenge should be valid base-64 encoding",
+          {
+            status: Status.BadRequest,
+          },
+        ),
+        true,
+      ),
+    );
+  });
+
+  it("should return Err(400) response when the user-pass is invalid", async () => {
+    const authorizer = spy(() => false);
+    const basic = new Basic(authorizer);
+    const result = await basic.authenticate({ params: btoa("invalid") });
+
+    assertSpyCalls(authorizer, 0);
+    assertErr(result);
+    assert(
+      await equalsResponse(
+        result.response,
+        new Response(
+          "Authorization challenge should be valid user-pass",
+          {
+            status: Status.BadRequest,
+          },
+        ),
+        true,
+      ),
+    );
+  });
+
+  it("should return Err(401) response when the user pass matched", async () => {
+    const authorizer = spy(() => false);
+    const basic = new Basic(authorizer);
+    const result = await basic.authenticate({ params: btoa("admin:123456") });
+
+    assertSpyCalls(authorizer, 1);
+    assertErr(result);
+    assert(
+      await equalsResponse(
+        result.response,
+        new Response(null, {
+          status: Status.Unauthorized,
+          headers: {
+            [AuthenticationHeader.WWWAuthenticate]: `Basic realm="Secure area"`,
+          },
+        }),
+        true,
+      ),
+    );
   });
 
   it("should throw error if the options is invalid", () => {

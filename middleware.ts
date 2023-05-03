@@ -26,6 +26,10 @@ export function auth(
   return _auth.bind(null, authentications);
 }
 
+const enum Msg {
+  InvalidHeader = "Authorization header should be valid syntax",
+}
+
 export async function _auth(
   authentications: readonly Authentication[],
   request: Request,
@@ -37,7 +41,9 @@ export async function _auth(
 
   const result = unsafe(() => parseAuthorization(authorization));
 
-  if (isErr(result)) return respond();
+  if (isErr(result)) {
+    return new Response(Msg.InvalidHeader, { status: Status.BadRequest });
+  }
 
   const { authScheme, params } = result.value;
 
@@ -47,13 +53,15 @@ export async function _auth(
       continue;
     }
 
-    const pass = await authentication.authenticate({
+    const result = await authentication.authenticate({
       params,
       request,
       authScheme,
     });
 
-    if (pass) return next(request);
+    if (result.type === "ok") return next(request);
+
+    return result.response;
   }
 
   return respond();

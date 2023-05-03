@@ -1,7 +1,12 @@
 // Copyright 2023-latest the httpland authors. All rights reserved. MIT license.
 // This module is browser compatible.
 
-import { timingSafeEqual as _timingSafeEqual } from "./deps.ts";
+import {
+  AuthenticationHeader,
+  Status,
+  timingSafeEqual as _timingSafeEqual,
+} from "./deps.ts";
+import type { AuthenticationError, AuthenticationOk } from "./types.ts";
 import { Char } from "./constants.ts";
 
 /** Whether the inputs same as case insensitive or not. */
@@ -51,4 +56,28 @@ export function quoted<T extends string>(
   }
 
   return `${Char.DQuote}${input}${Char.DQuote}` as never;
+}
+
+export function ok(): AuthenticationOk {
+  return { type: "ok" };
+}
+
+export function err(response: Response): AuthenticationError {
+  return { type: "error", response };
+}
+
+export function badRequest(
+  body?: BodyInit | null | undefined,
+  init?: ResponseInit,
+): Response {
+  return new Response(body, { ...init, status: Status.BadRequest });
+}
+
+export function unauthorized(authenticate: string): Response {
+  return new Response(null, {
+    status: Status.Unauthorized,
+    headers: {
+      [AuthenticationHeader.WWWAuthenticate]: authenticate,
+    },
+  });
 }

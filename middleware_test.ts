@@ -5,7 +5,9 @@ import {
   AuthenticationHeader,
   describe,
   equalsResponse,
+  err,
   it,
+  ok,
   spy,
   Status,
 } from "./_dev_deps.ts";
@@ -14,7 +16,7 @@ import { auth } from "./mod.ts";
 describe("auth", () => {
   it("should return unauthenticated response when the authorization header is none. The handler and authenticate should not call", async () => {
     const handler = spy(() => new Response());
-    const authenticate = spy(() => true);
+    const authenticate = spy(() => ok());
     const challenge = spy(() => "test");
 
     const middleware = auth({ scheme: "a", authenticate, challenge });
@@ -39,9 +41,9 @@ describe("auth", () => {
     );
   });
 
-  it("should return unauthenticated response when the authorization header is invalid. The handler and authenticate should not call", async () => {
+  it("should return challenge unauthenticated response when the authorization header is invalid. The handler and authenticate should not call", async () => {
     const handler = spy(() => new Response());
-    const authenticate = spy(() => true);
+    const authenticate = spy(() => ok());
     const challenge = spy(() => "test");
     const middleware = auth({
       scheme: "a",
@@ -57,15 +59,12 @@ describe("auth", () => {
 
     assertSpyCalls(handler, 0);
     assertSpyCalls(authenticate, 0);
-    assertSpyCalls(challenge, 1);
+    assertSpyCalls(challenge, 0);
     assert(
       equalsResponse(
         response,
-        new Response(null, {
-          status: Status.Unauthorized,
-          headers: {
-            [AuthenticationHeader.WWWAuthenticate]: "test",
-          },
+        new Response(`Authorization header should be valid syntax`, {
+          status: Status.BadRequest,
         }),
       ),
     );
@@ -73,7 +72,8 @@ describe("auth", () => {
 
   it("should return unauthenticated response when the authorization is false. The handler should not call", async () => {
     const handler = spy(() => new Response());
-    const authenticate = spy(() => false);
+    const initResponse = new Response();
+    const authenticate = spy(() => err(initResponse));
     const challenge = spy(() => "test");
 
     const middleware = auth({
@@ -90,23 +90,12 @@ describe("auth", () => {
 
     assertSpyCalls(handler, 0);
     assertSpyCalls(authenticate, 1);
-    assertSpyCalls(challenge, 1);
-
-    assert(
-      equalsResponse(
-        response,
-        new Response(null, {
-          status: Status.Unauthorized,
-          headers: {
-            [AuthenticationHeader.WWWAuthenticate]: "test",
-          },
-        }),
-      ),
-    );
+    assertSpyCalls(challenge, 0);
+    assert(response === initResponse);
   });
 
   it("should return handler response when the authorization is valid", async () => {
-    const authenticate = spy(() => true);
+    const authenticate = spy(() => ok());
     const handler = spy(() => new Response());
     const challenge = spy(() => "");
 
@@ -134,7 +123,7 @@ describe("auth", () => {
   it(
     "should return handler response when the authorization case insensitive scheme is same",
     async () => {
-      const authenticate = spy(() => true);
+      const authenticate = spy(() => ok());
       const handler = spy(() => new Response());
       const challenge = spy(() => "");
 

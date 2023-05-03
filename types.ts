@@ -11,7 +11,22 @@ export interface Authentication {
 
   challenge: (context: CommonAuthContext) => string | Promise<string>;
 
-  authenticate: (context: AuthContext) => boolean | Promise<boolean>;
+  authenticate: (
+    context: AuthContext,
+  ) => AuthenticationResult | Promise<AuthenticationResult>;
+}
+
+export type AuthenticationResult =
+  | { type: "ok" }
+  | { type: "error"; response: Response };
+
+export interface AuthenticationOk {
+  type: "ok";
+}
+
+export interface AuthenticationError {
+  type: "error";
+  response: Response;
 }
 
 export interface AuthParamsContext {
