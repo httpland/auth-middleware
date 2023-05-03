@@ -1,3 +1,11 @@
+# [1.0.0-beta.3](https://github.com/httpland/auth-middleware/compare/1.0.0-beta.2...1.0.0-beta.3) (2023-05-03)
+
+
+### Features
+
+* **bearer:** add bearer authentication ([1c7b498](https://github.com/httpland/auth-middleware/commit/1c7b498205842596495ebcf6da03615ed9ed58ec))
+* **types:** change Authentication#authenticate interface ([3549555](https://github.com/httpland/auth-middleware/commit/354955578a01f8eaee41bf4d32d823988e50cbdf))
+
 # [1.0.0-beta.2](https://github.com/httpland/auth-middleware/compare/1.0.0-beta.1...1.0.0-beta.2) (2023-05-02)
 
 
